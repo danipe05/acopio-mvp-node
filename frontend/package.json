@@ -1,0 +1,11 @@
+{
+  "name": "acopio-frontend",
+  "version": "1.0.0",
+  "description": "Frontend para la gestión de centros de acopio",
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/input.css -o ./public/output.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
+  }
+}

@@ -1,0 +1,64 @@
+services:
+  # Servicio de Base de Datos (PostgreSQL Alpine)
+  db:
+    image: postgres:15-alpine
+    container_name: acopio_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-acopio_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-acopio_password}
+      POSTGRES_DB: ${POSTGRES_DB:-acopio_db}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - acopio_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-acopio_user} -d $${POSTGRES_DB:-acopio_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Servicio de Backend (Express + Prisma)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: acopio_backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-acopio_user}:${POSTGRES_PASSWORD:-acopio_password}@db:5432/${POSTGRES_DB:-acopio_db}?schema=public
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - acopio_network
+
+  # Servicio de Frontend (Nginx + HTML/HTMX + CSS Compilado)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: acopio_frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - acopio_network
+
+# Volúmenes persistentes para la Base de Datos
+volumes:
+  pgdata:
+    driver: local
+
+# Red interna privada para intercomunicación
+networks:
+  acopio_network:
+    driver: bridge

@@ -1,0 +1,100 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+enum Role {
+  ADMIN
+  VOLUNTEER
+}
+
+enum MovementType {
+  IN
+  OUT
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      Role     @default(VOLUNTEER)
+  centerId  String?
+  center    Center?  @relation(fields: [centerId], references: [id])
+  batches   Batch[]
+  movements Movement[]
+  createdAt DateTime @default(now())
+}
+
+model Center {
+  id        String   @id @default(cuid())
+  name      String
+  address   String
+  status    String   @default("ACTIVE")
+  users     User[]
+  batches   Batch[]
+  movements Movement[]
+  createdAt DateTime @default(now())
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  name      String   @unique // e.g. Kg, Litro, Unidad
+  items     Item[]
+}
+
+model Item {
+  id         String     @id @default(cuid())
+  name       String
+  unitId     String
+  unit       Unit       @relation(fields: [unitId], references: [id])
+  batches    Batch[]
+  movements  Movement[]
+}
+
+model Batch {
+  id              String     @id @default(cuid())
+  itemId          String
+  item            Item       @relation(fields: [itemId], references: [id])
+  centerId        String
+  center          Center     @relation(fields: [centerId], references: [id])
+  initialQuantity Float
+  currentQuantity Float
+  origin          String
+  createdById     String
+  createdBy       User       @relation(fields: [createdById], references: [id])
+  receivedAt      DateTime   @default(now())
+  createdAt       DateTime   @default(now())
+}
+
+model Destination {
+  id         String     @id @default(cuid())
+  name       String
+  priority   Priority   @default(LOW)
+  movements  Movement[]
+}
+
+model Movement {
+  id            String       @id @default(cuid())
+  type          MovementType
+  centerId      String
+  center        Center       @relation(fields: [centerId], references: [id])
+  itemId        String
+  item          Item         @relation(fields: [itemId], references: [id])
+  quantity      Float
+  destinationId String?
+  destination   Destination? @relation(fields: [destinationId], references: [id])
+  createdById   String
+  createdBy     User         @relation(fields: [createdById], references: [id])
+  createdAt     DateTime     @default(now())
+}
