@@ -21,6 +21,11 @@ class RegisterExit {
    * @returns {Object} The created Movement record.
    */
   async execute({ itemId, centerId, quantity, destinationId, createdById }) {
+    // Guard clause: destinationId is mandatory for OUT movements (BR-03: Trazabilidad Obligatoria).
+    if (!destinationId || typeof destinationId !== 'string' || destinationId.trim() === '') {
+      throw new Error('El destino de envío es obligatorio para registrar una salida de inventario.');
+    }
+
     // Validate quantity type before domain validation.
     const parsedQuantity = parseInt(quantity, 10);
     if (isNaN(parsedQuantity) || parsedQuantity <= 0) {

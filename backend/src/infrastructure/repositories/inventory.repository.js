@@ -85,9 +85,11 @@ class InventoryRepository {
         }
 
         // Step 2: Fetch active batches ordered by receivedAt ascending (FIFO).
+        // Select only fields needed for discount to avoid over-fetching (code-instructions §5).
         const activeBatches = await tx.batch.findMany({
           where: { itemId, centerId, currentQuantity: { gt: 0 } },
-          orderBy: { receivedAt: 'asc' }
+          orderBy: { receivedAt: 'asc' },
+          select: { id: true, currentQuantity: true }
         });
 
         // Step 3: Iterative FIFO discount.
@@ -134,6 +136,100 @@ class InventoryRepository {
       throw new Error(`Error en la transacción de salida: ${error.message}`);
     }
   }
+
+  /**
+   * Retrieves consolidated stock for a given center.
+   * Groups batches by itemId, sums currentQuantity, and enriches with item details.
+   * Optionally filters by item name (case-insensitive partial match).
+   *
+   * @param {string} centerId - The center to query stock for.
+   * @param {string} [searchTerm] - Optional partial name filter.
+   * @returns {Array<Object>} Array of { item, totalStock } objects.
+   */
+  async getConsolidatedStock(centerId, searchTerm = '') {
+    try {
+      // Build item filter for the search term.
+      const itemFilter = searchTerm.trim()
+        ? { name: { contains: searchTerm.trim(), mode: 'insensitive' } }
+        : {};
+
+      // Fetch items that match the filter and belong to the center via batches.
+      const items = await this.prisma.item.findMany({
+        where: {
+          ...itemFilter,
+          batches: {
+            some: {
+              centerId,
+              currentQuantity: { gt: 0 }
+            }
+          }
+        },
+        include: {
+          category: true,
+          unit: true,
+          batches: {
+            where: {
+              centerId,
+              currentQuantity: { gt: 0 }
+            },
+            select: {
+              currentQuantity: true
+            }
+          }
+        },
+        orderBy: { name: 'asc' }
+      });
+
+      // Map to consolidated rows summing batch quantities.
+      return items.map(item => ({
+        item: {
+          id: item.id,
+          name: item.name,
+          category: item.category,
+          unit: item.unit
+        },
+        totalStock: item.batches.reduce((sum, b) => sum + b.currentQuantity, 0)
+      }));
+    } catch (error) {
+      console.error('[InventoryRepository] Error fetching consolidated stock:', error);
+      throw new Error('Error al consultar el inventario consolidado.');
+    }
+  }
+
+  /**
+   * Retrieves paged movement history for a specific center.
+   * Ordered by createdAt desc (most recent first).
+   *
+   * @param {Object} params
+   * @param {string} params.centerId - Center of operations.
+   * @param {number} [params.page] - Page number (1-indexed).
+   * @param {number} [params.limit] - Page size.
+   * @returns {Promise<Array<Object>>} List of movement records.
+   */
+  async getMovementsHistory({ centerId, page = 1, limit = 20 }) {
+    try {
+      const skip = (page - 1) * limit;
+      return await this.prisma.movement.findMany({
+        where: { centerId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          item: {
+            include: { unit: true }
+          },
+          createdBy: {
+            select: { name: true }
+          },
+          destination: true
+        }
+      });
+    } catch (error) {
+      console.error('[InventoryRepository] Error fetching movements history:', error);
+      throw new Error('Error al consultar el historial de movimientos.');
+    }
+  }
 }
 
 module.exports = InventoryRepository;
+

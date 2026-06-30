@@ -190,6 +190,14 @@ function registerExitForm(items, destinations) {
               <option value="" disabled selected>Seleccione el destino de entrega...</option>
               ${destinationOptions}
             </select>
+            ${criticalDests.length > 0 ? `
+              <p class="mt-1.5 text-xs text-red-600 flex items-center space-x-1">
+                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                </svg>
+                <span>Los destinos marcados como <strong>URGENTE</strong> tienen prioridad de despacho inmediato.</span>
+              </p>
+            ` : ''}
           </div>
 
           <div>
@@ -213,9 +221,264 @@ function registerExitForm(items, destinations) {
   `;
 }
 
+/**
+ * Renders a single stock table row.
+ * @param {Object} row - { item: { name, category, unit }, totalStock }
+ */
+function stockTableRow(row) {
+  return `
+    <tr class="hover:bg-gray-50/70 border-b border-gray-100 transition duration-150">
+      <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-800">${row.item.name}</td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200/50">
+          ${row.item.category ? row.item.category.name : '—'}
+        </span>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-center">
+        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold ${row.totalStock > 0 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'}">
+          ${row.totalStock}
+        </span>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600 hidden sm:table-cell">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-100">
+          ${row.item.unit ? row.item.unit.name : '—'}
+        </span>
+      </td>
+    </tr>
+  `;
+}
+
+/**
+ * Renders only the table rows (used by the HTMX search endpoint).
+ * @param {Array} stockRows - Array of { item, totalStock }.
+ */
+function stockTableRows(stockRows) {
+  if (stockRows.length === 0) {
+    return `
+      <tr>
+        <td colspan="4" class="px-6 py-10 text-center text-sm text-gray-400">
+          <svg class="mx-auto h-8 w-8 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          No se encontraron insumos.
+        </td>
+      </tr>
+    `;
+  }
+
+  return stockRows.map(row => stockTableRow(row)).join('');
+}
+
+/**
+ * Renders the full stock dashboard with search bar and table.
+ * @param {Array} stockRows - Array of { item, totalStock }.
+ * @param {string} centerName - Name of the current center.
+ */
+function stockDashboard(stockRows, centerName) {
+  return `
+    <div class="space-y-6">
+
+      <!-- Page Title -->
+      <div>
+        <h1 class="text-2xl font-black text-gray-900 tracking-tight flex items-center space-x-2">
+          <span class="bg-gradient-to-tr from-blue-500 via-amber-400 to-blue-600 text-white p-2 rounded-xl">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </span>
+          <span>Inventario Actual</span>
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">Stock consolidado en tiempo real del centro <strong class="text-gray-700">${centerName}</strong>.</p>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm relative">
+        <div class="flex items-center space-x-3">
+          <div class="relative flex-1">
+            <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input type="text" name="q" placeholder="Buscar insumo por nombre..."
+                   hx-get="/volunteer/inventory/stock/search"
+                   hx-trigger="keyup changed delay:400ms"
+                   hx-target="#stock-table-body"
+                   hx-indicator="#search-spinner"
+                   class="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition" />
+          </div>
+          <span id="search-spinner" class="htmx-indicator flex items-center">
+            <svg class="animate-spin h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <!-- Stock Table -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-100">
+            <thead class="bg-gray-50/50">
+              <tr>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Insumo</th>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:table-cell">Categoría</th>
+                <th scope="col" class="px-6 py-3.5 text-center text-xs font-bold text-gray-400 uppercase tracking-wider">Stock</th>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Unidad</th>
+              </tr>
+            </thead>
+            <tbody id="stock-table-body" class="divide-y divide-gray-100">
+              ${stockTableRows(stockRows)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+/**
+ * Renders a single row in the movements table.
+ * If isLast is true and we have a nextPage, attaches HTMX infinite scroll triggers.
+ *
+ * @param {Object} movement - The movement object.
+ * @param {boolean} isLast - Whether this is the last element in the current page.
+ * @param {number} [nextPage] - The number of the next page to fetch.
+ */
+function movementTableRow(movement, isLast = false, nextPage = null) {
+  const typeText = movement.type === 'IN' ? 'Entrada' : 'Salida';
+  const typeClass = movement.type === 'IN' 
+    ? 'bg-green-50 text-green-700 border-green-200' 
+    : 'bg-red-50 text-red-700 border-red-200';
+  const quantityText = `${movement.quantity} ${movement.item.unit ? movement.item.unit.name : 'Unidades'}`;
+  const destinationText = movement.type === 'OUT' && movement.destination 
+    ? `<span class="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded ${movement.destination.isCritical ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}">${movement.destination.isCritical ? '🚨 ' : ''}${movement.destination.name}</span>`
+    : '<span class="text-gray-400">—</span>';
+  
+  const creatorName = movement.createdBy ? movement.createdBy.name : 'Sistema';
+  const formattedDate = new Date(movement.createdAt).toLocaleString('es-VE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const htmxAttrs = isLast && nextPage 
+    ? ` hx-get="/volunteer/inventory/movements?page=${nextPage}" hx-trigger="revealed" hx-swap="afterend"` 
+    : '';
+
+  return `
+    <tr class="hover:bg-gray-50/70 border-b border-gray-100 transition duration-150"${htmxAttrs}>
+      <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${typeClass}">
+          ${typeText === 'Entrada' ? '📥' : '📤'} ${typeText}
+        </span>
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-800 font-semibold">
+        ${movement.item.name}
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right sm:text-left">
+        ${quantityText}
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm hidden sm:table-cell">
+        ${destinationText}
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+        ${creatorName}
+      </td>
+      <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 font-mono hidden sm:table-cell">
+        ${formattedDate}
+      </td>
+    </tr>
+  `;
+}
+
+/**
+ * Maps an array of movements to rows, applying infinite scroll logic to the last item.
+ */
+function movementTableRows(movements, page = 1, limit = 20) {
+  if (movements.length === 0) {
+    if (page === 1) {
+      return `
+        <tr>
+          <td colspan="6" class="px-6 py-10 text-center text-sm text-gray-400">
+            <svg class="mx-auto h-8 w-8 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            No hay movimientos registrados.
+          </td>
+        </tr>
+      `;
+    }
+    // For later pages, return empty response so HTMX doesn't append anything
+    return '';
+  }
+
+  // If we fetched a full page, there might be a next page.
+  const hasMore = movements.length === limit;
+  const nextPage = hasMore ? page + 1 : null;
+
+  return movements.map((movement, idx) => {
+    const isLast = idx === movements.length - 1;
+    return movementTableRow(movement, isLast, nextPage);
+  }).join('');
+}
+
+/**
+ * Renders the initial dashboard wrapper for movements history.
+ */
+function movementsHistoryDashboard(movements, centerName, page = 1, limit = 20) {
+  return `
+    <div class="space-y-6">
+
+      <!-- Page Title -->
+      <div>
+        <h1 class="text-2xl font-black text-gray-900 tracking-tight flex items-center space-x-2">
+          <span class="bg-gradient-to-tr from-[#0b1c3f] via-blue-800 to-amber-500 text-white p-2 rounded-xl">
+            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </span>
+          <span>Historial de Movimientos</span>
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">Bitácora cronológica de entradas y salidas en el centro <strong class="text-gray-700">${centerName}</strong>.</p>
+      </div>
+
+      <!-- History Table Container -->
+      <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-100">
+            <thead class="bg-gray-50/50">
+              <tr>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Operación</th>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Insumo</th>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Cantidad</th>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Destino</th>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider hidden md:table-cell">Registrado por</th>
+                <th scope="col" class="px-6 py-3.5 text-left text-xs font-bold text-gray-400 uppercase tracking-wider hidden sm:table-cell">Fecha y Hora</th>
+              </tr>
+            </thead>
+            <tbody id="movements-table-body" class="divide-y divide-gray-100">
+              ${movementTableRows(movements, page, limit)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
 module.exports = {
   errorBanner,
   successBanner,
   registerEntryForm,
-  registerExitForm
+  registerExitForm,
+  stockTableRows,
+  stockDashboard,
+  movementTableRow,
+  movementTableRows,
+  movementsHistoryDashboard
 };
+

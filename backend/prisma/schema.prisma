@@ -25,18 +25,18 @@ enum Priority {
 }
 
 model User {
-  id         String   @id @default(cuid())
-  email      String   @unique
+  id         String     @id @default(cuid())
+  email      String     @unique
   name       String
   password   String
   phone      String
   documentId String
-  role       Role     @default(VOLUNTEER)
+  role       Role       @default(VOLUNTEER)
   centerId   String?
-  center     Center?  @relation(fields: [centerId], references: [id])
+  center     Center?    @relation(fields: [centerId], references: [id])
   batches    Batch[]
   movements  Movement[]
-  createdAt  DateTime @default(now())
+  createdAt  DateTime   @default(now())
 }
 
 enum CenterStatus {
@@ -56,9 +56,9 @@ model Center {
 }
 
 model Unit {
-  id        String   @id @default(cuid())
-  name      String   @unique // e.g. Kg, Litro, Unidad
-  items     Item[]
+  id    String @id @default(cuid())
+  name  String @unique // e.g. Kg, Litro, Unidad
+  items Item[]
 }
 
 model Category {
@@ -92,6 +92,9 @@ model Batch {
   movements       Movement[]
   receivedAt      DateTime   @default(now())
   createdAt       DateTime   @default(now())
+
+  // Performance: accelerates FIFO queries (findMany by itemId+centerId, orderBy receivedAt)
+  @@index([itemId, centerId])
 }
 
 model Destination {
@@ -116,4 +119,9 @@ model Movement {
   createdById   String
   createdBy     User         @relation(fields: [createdById], references: [id])
   createdAt     DateTime     @default(now())
+
+  // Performance: accelerates daily movement history by center (HU-07)
+  @@index([centerId, createdAt])
+  // Performance: accelerates audit lookups by item
+  @@index([itemId])
 }

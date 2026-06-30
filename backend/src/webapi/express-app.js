@@ -6,6 +6,7 @@ const volunteerRoutes = require('./routes/volunteer.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const catalogRoutes = require('./routes/catalog.routes');
 const inventoryRoutes = require('./routes/inventory.routes');
+const authRoutes = require('./routes/auth.routes');
 
 const app = express();
 
@@ -20,5 +21,8 @@ app.use('/api', volunteerRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', catalogRoutes);
 app.use('/api', inventoryRoutes);
+app.use('/', inventoryRoutes);
+app.use('/', dashboardRoutes);
+app.use('/', authRoutes);
 
 module.exports = app;

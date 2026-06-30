@@ -177,7 +177,89 @@ const inventoryController = {
         views.errorBanner(error.message)
       );
     }
+  },
+
+  /**
+   * GET /volunteer/inventory/stock
+   * Renders the full stock dashboard with search bar and table.
+   */
+  getStockView: async (req, res) => {
+    try {
+      const centerId = await resolveCenterId(req, res);
+      if (!centerId) return;
+
+      // Fetch center name for the dashboard header.
+      const center = await prisma.center.findUnique({ where: { id: centerId } });
+      const centerName = center ? center.name : 'Centro Desconocido';
+
+      const stockRows = await inventoryRepository.getConsolidatedStock(centerId);
+      const html = views.stockDashboard(stockRows, centerName);
+      renderView(req, res, html);
+    } catch (error) {
+      console.error('[InventoryController] Error rendering stock view:', error);
+      res.status(500).send(
+        views.errorBanner('Ocurrió un error al cargar el inventario actual.')
+      );
+    }
+  },
+
+  /**
+   * GET /volunteer/inventory/stock/search?q=term
+   * Returns only the filtered table rows as an HTMX partial.
+   */
+  searchStock: async (req, res) => {
+    try {
+      const centerId = await resolveCenterId(req, res);
+      if (!centerId) return;
+
+      const searchTerm = req.query.q || '';
+      const stockRows = await inventoryRepository.getConsolidatedStock(centerId, searchTerm);
+      res.send(views.stockTableRows(stockRows));
+    } catch (error) {
+      console.error('[InventoryController] Error searching stock:', error);
+      res.status(500).send(
+        views.errorBanner('Ocurrió un error al buscar en el inventario.')
+      );
+    }
+  },
+
+  /**
+   * GET /volunteer/inventory/movements
+   * Renders the movements history.
+   * If normal request, returns full layout with dashboard wrapper.
+   * If HTMX request, returns only <tr> rows for infinite scroll pagination.
+   */
+  getMovementsHistory: async (req, res) => {
+    try {
+      const centerId = await resolveCenterId(req, res);
+      if (!centerId) return;
+
+      const page = parseInt(req.query.page, 10) || 1;
+      const limit = 20;
+
+      const movements = await inventoryRepository.getMovementsHistory({
+        centerId,
+        page,
+        limit
+      });
+
+      if (req.headers['hx-request']) {
+        // Return only the rows. If empty, returns empty string which stops infinite scroll trigger.
+        res.send(views.movementTableRows(movements, page, limit));
+      } else {
+        const center = await prisma.center.findUnique({ where: { id: centerId } });
+        const centerName = center ? center.name : 'Centro Desconocido';
+        const html = views.movementsHistoryDashboard(movements, centerName, page, limit);
+        renderView(req, res, html);
+      }
+    } catch (error) {
+      console.error('[InventoryController] Error fetching movements history:', error);
+      res.status(500).send(
+        views.errorBanner('Ocurrió un error al cargar el historial de movimientos.')
+      );
+    }
   }
 };
 
 module.exports = inventoryController;
+

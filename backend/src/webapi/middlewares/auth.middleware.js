@@ -1,6 +1,8 @@
 const crypto = require('crypto');
 const prisma = require('../../infrastructure/database/prisma-client');
 
+const SESSION_SECRET = 'VenezuelaAcopioCentralMVPSecretKey2026';
+
 const seedCatalogBases = async () => {
   try {
     const categoriesCount = await prisma.category.count();
@@ -35,49 +37,72 @@ const seedCatalogBases = async () => {
   }
 };
 
-const getOrCreateMockAdmin = async () => {
-  try {
-    // Run catalog bases seed
-    await seedCatalogBases();
+const parseCookies = (cookieHeader) => {
+  const list = {};
+  if (!cookieHeader) return list;
+  cookieHeader.split(';').forEach(cookie => {
+    const parts = cookie.split('=');
+    list[parts.shift().trim()] = decodeURI(parts.join('='));
+  });
+  return list;
+};
 
-    let admin = await prisma.user.findFirst({
-      where: { role: 'ADMIN' }
-    });
-
-    if (!admin) {
-      const defaultPasswordHash = crypto.createHash('sha256').update('admin123').digest('hex');
-      admin = await prisma.user.create({
-        data: {
-          email: 'admin@acopio.com',
-          name: 'Administrador Default',
-          role: 'ADMIN',
-          password: defaultPasswordHash,
-          phone: '0000000000',
-          documentId: '00000000'
-        }
-      });
-    }
-
-    return admin;
-  } catch (error) {
-    console.error('[Auth Middleware] Error getting/creating mock admin:', error);
-    throw error;
+const verifyToken = (token) => {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const [userId, hmac] = parts;
+  const expectedHmac = crypto.createHmac('sha256', SESSION_SECRET).update(userId).digest('hex');
+  if (hmac === expectedHmac) {
+    return userId;
   }
+  return null;
 };
 
 /**
- * Middleware to mock authenticated users and set req.user.
+ * Cryptographic Signed Cookie Session Middleware.
  */
 const isAuthenticated = async (req, res, next) => {
   try {
-    // In a production system, this would decode a JWT or verify a session cookie.
-    // For this MVP, we fetch/create our default ADMIN user to guarantee audit compliance.
-    const admin = await getOrCreateMockAdmin();
-    req.user = admin;
+    await seedCatalogBases();
+
+    const cookies = parseCookies(req.headers.cookie);
+    const token = cookies.session_token;
+    const userId = verifyToken(token);
+
+    if (!userId) {
+      if (req.headers['hx-request']) {
+        res.setHeader('HX-Redirect', '/auth/login');
+        return res.status(401).send('Sesión expirada o no iniciada. Redirigiendo...');
+      } else {
+        return res.redirect('/auth/login');
+      }
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { center: true }
+    });
+
+    if (!user) {
+      if (req.headers['hx-request']) {
+        res.setHeader('HX-Redirect', '/auth/login');
+        return res.status(401).send('Usuario no encontrado. Redirigiendo...');
+      } else {
+        return res.redirect('/auth/login');
+      }
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     console.error('[Auth Middleware] Authentication failed:', error);
-    res.status(500).send('<div class="p-4 bg-red-100 text-red-800 rounded-xl border border-red-200">Error interno de autenticación</div>');
+    if (req.headers['hx-request']) {
+      res.setHeader('HX-Redirect', '/auth/login');
+      return res.status(401).send('Error de autenticación. Redirigiendo...');
+    } else {
+      return res.redirect('/auth/login');
+    }
   }
 };
 
@@ -88,7 +113,10 @@ const isAuthenticated = async (req, res, next) => {
 const requireRole = (role) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).send('<div class="p-4 bg-red-100 text-red-800 rounded-xl border border-red-200">No autenticado</div>');
+      if (req.headers['hx-request']) {
+        res.setHeader('HX-Redirect', '/auth/login');
+      }
+      return res.status(401).send('No autenticado');
     }
 
     if (req.user.role === role || req.user.role === 'ADMIN') {
