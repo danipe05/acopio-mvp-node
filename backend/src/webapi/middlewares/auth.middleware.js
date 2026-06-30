@@ -91,7 +91,7 @@ const requireRole = (role) => {
       return res.status(401).send('<div class="p-4 bg-red-100 text-red-800 rounded-xl border border-red-200">No autenticado</div>');
     }
 
-    if (req.user.role === role) {
+    if (req.user.role === role || req.user.role === 'ADMIN') {
       return next();
     }
 

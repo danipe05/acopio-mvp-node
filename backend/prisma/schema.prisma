@@ -84,11 +84,12 @@ model Batch {
   item            Item       @relation(fields: [itemId], references: [id])
   centerId        String
   center          Center     @relation(fields: [centerId], references: [id])
-  initialQuantity Float
-  currentQuantity Float
+  initialQuantity Int
+  currentQuantity Int
   origin          String
   createdById     String
   createdBy       User       @relation(fields: [createdById], references: [id])
+  movements       Movement[]
   receivedAt      DateTime   @default(now())
   createdAt       DateTime   @default(now())
 }
@@ -107,7 +108,9 @@ model Movement {
   center        Center       @relation(fields: [centerId], references: [id])
   itemId        String
   item          Item         @relation(fields: [itemId], references: [id])
-  quantity      Float
+  quantity      Int
+  batchId       String?
+  batch         Batch?       @relation(fields: [batchId], references: [id])
   destinationId String?
   destination   Destination? @relation(fields: [destinationId], references: [id])
   createdById   String

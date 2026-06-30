@@ -121,6 +121,42 @@
                 </svg>
                 <span>Gestionar Voluntarios</span>
             </button>
+
+            <button hx-get="/api/admin/catalog" 
+                    hx-target="#main-content" 
+                    hx-swap="innerHTML"
+                    hx-indicator="#nav-spinner"
+                    onclick="if(window.innerWidth < 768) toggleSidebar();"
+                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition duration-150 group">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-amber-400 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                <span>Gestionar Donaciones</span>
+            </button>
+
+            <button hx-get="/api/volunteer/inventory/in" 
+                    hx-target="#main-content" 
+                    hx-swap="innerHTML"
+                    hx-indicator="#nav-spinner"
+                    onclick="if(window.innerWidth < 768) toggleSidebar();"
+                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition duration-150 group">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-amber-400 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Registrar Entrada</span>
+            </button>
+
+            <button hx-get="/api/volunteer/inventory/out" 
+                    hx-target="#main-content" 
+                    hx-swap="innerHTML"
+                    hx-indicator="#nav-spinner"
+                    onclick="if(window.innerWidth < 768) toggleSidebar();"
+                    class="w-full flex items-center space-x-3 px-4 py-3 text-sm font-semibold rounded-xl text-gray-300 hover:text-white hover:bg-white/5 transition duration-150 group">
+                <svg class="w-5 h-5 text-gray-400 group-hover:text-amber-400 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Registrar Salida</span>
+            </button>
         </nav>
 
         <!-- Sidebar Footer / Diagnostics -->
