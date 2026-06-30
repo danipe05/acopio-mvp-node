@@ -25,26 +25,34 @@ enum Priority {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  role      Role     @default(VOLUNTEER)
-  centerId  String?
-  center    Center?  @relation(fields: [centerId], references: [id])
-  batches   Batch[]
-  movements Movement[]
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  email      String   @unique
+  name       String
+  password   String
+  phone      String
+  documentId String
+  role       Role     @default(VOLUNTEER)
+  centerId   String?
+  center     Center?  @relation(fields: [centerId], references: [id])
+  batches    Batch[]
+  movements  Movement[]
+  createdAt  DateTime @default(now())
+}
+
+enum CenterStatus {
+  ACTIVE
+  INACTIVE
 }
 
 model Center {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   name      String
   address   String
-  status    String   @default("ACTIVE")
+  status    CenterStatus @default(ACTIVE)
   users     User[]
   batches   Batch[]
   movements Movement[]
-  createdAt DateTime @default(now())
+  createdAt DateTime     @default(now())
 }
 
 model Unit {
@@ -53,9 +61,17 @@ model Unit {
   items     Item[]
 }
 
+model Category {
+  id    String @id @default(cuid())
+  name  String @unique
+  items Item[]
+}
+
 model Item {
   id         String     @id @default(cuid())
   name       String
+  categoryId String
+  category   Category   @relation(fields: [categoryId], references: [id])
   unitId     String
   unit       Unit       @relation(fields: [unitId], references: [id])
   batches    Batch[]
@@ -80,7 +96,7 @@ model Batch {
 model Destination {
   id         String     @id @default(cuid())
   name       String
-  priority   Priority   @default(LOW)
+  isCritical Boolean    @default(false)
   movements  Movement[]
 }
 
